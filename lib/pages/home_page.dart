@@ -1,5 +1,9 @@
 part of 'pages.dart';
 
+Future _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  print("Handling a background message: ${message.messageId}");
+}
+
 class HomePage extends StatefulWidget {
   @override
   _HomePageState createState() => _HomePageState();
@@ -14,12 +18,46 @@ class _HomePageState extends State {
   void initState() {
     _totalNotifications = 0;
     registerNotification();
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      PushNotification notification = PushNotification(
+        title: message.notification?.title,
+        body: message.notification?.body,
+        name: message.data['name'],
+      );
+      setState(() {
+        _notificationInfo = notification;
+        _totalNotifications++;
+      });
+    });
+
+    checkForInitialMessage();
+
     super.initState();
+  }
+
+  checkForInitialMessage() async {
+    await Firebase.initializeApp();
+    RemoteMessage? initialMessage =
+        await FirebaseMessaging.instance.getInitialMessage();
+
+    if (initialMessage != null) {
+      PushNotification notification = PushNotification(
+        title: initialMessage.notification?.title,
+        body: initialMessage.notification?.body,
+        name: initialMessage.data['name'],
+      );
+      setState(() {
+        _notificationInfo = notification;
+        _totalNotifications++;
+      });
+    }
   }
 
   void registerNotification() async {
     // 1. Initialize the Firebase app
     await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
     // 2. Instantiate Firebase Messaging
     _messaging = FirebaseMessaging.instance;
@@ -41,6 +79,7 @@ class _HomePageState extends State {
         PushNotification notification = PushNotification(
           title: message.notification?.title,
           body: message.notification?.body,
+          name: message.data['name'],
         );
 
         setState(() {
@@ -107,6 +146,14 @@ class _HomePageState extends State {
                         fontSize: 16.0,
                       ),
                     ),
+                    SizedBox(height: 8.0),
+                    Text(
+                      'NAME: ${_notificationInfo!.name}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16.0,
+                      ),
+                    ),
                   ],
                 )
               : Container(),
@@ -118,10 +165,8 @@ class _HomePageState extends State {
 }
 
 class PushNotification {
-  PushNotification({
-    this.title,
-    this.body,
-  });
+  PushNotification({this.title, this.body, this.name});
   String? title;
   String? body;
+  String? name;
 }
